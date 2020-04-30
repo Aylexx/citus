@@ -1648,15 +1648,15 @@ SubqueryPushdownMultiNodeTree(Query *originalQuery)
 	 */
 	if (extendedOpNode->groupClauseList != NIL)
 	{
-		extendedOpNode->targetList =
-			(List *) expression_tree_mutator((Node *) extendedOpNode->targetList,
-											 AddAnyValueAggregates,
-											 extendedOpNode->groupClauseList);
+		extendedOpNode->targetList = (List *) WrapUngroupedVarsInAnyValueAggregate(
+			(Node *) extendedOpNode->targetList,
+			extendedOpNode->groupClauseList,
+			extendedOpNode->targetList);
 
 		extendedOpNode->havingQual =
-			expression_tree_mutator((Node *) extendedOpNode->havingQual,
-									AddAnyValueAggregates,
-									extendedOpNode->groupClauseList);
+			WrapUngroupedVarsInAnyValueAggregate((Node *) extendedOpNode->havingQual,
+												 extendedOpNode->groupClauseList,
+												 extendedOpNode->targetList);
 	}
 
 	/*
