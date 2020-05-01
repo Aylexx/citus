@@ -153,8 +153,13 @@ InitializeMaintenanceDaemonBackend(void)
 
 	if (dbData == NULL)
 	{
-		/* FIXME: better message, reference relevant guc in hint */
-		ereport(ERROR, (errmsg("ran out of database slots")));
+		ereport(WARNING, (errmsg("could not start maintenance background worker"),
+						  errdetail("Ran out of database slots"),
+						  errhint("Increasing max_worker_processes might help.")));
+
+		LWLockRelease(&MaintenanceDaemonControl->lock);
+
+		return;
 	}
 
 	/* maintenance daemon can ignore itself */
@@ -168,8 +173,6 @@ InitializeMaintenanceDaemonBackend(void)
 	{
 		BackgroundWorker worker;
 		BackgroundWorkerHandle *handle = NULL;
-
-		dbData->userOid = extensionOwner;
 
 		memset(&worker, 0, sizeof(worker));
 
@@ -200,11 +203,17 @@ InitializeMaintenanceDaemonBackend(void)
 
 		if (!RegisterDynamicBackgroundWorker(&worker, &handle))
 		{
-			ereport(ERROR, (errmsg("could not start maintenance background worker"),
-							errhint("Increasing max_worker_processes might help.")));
+			ereport(WARNING, (errmsg("could not start maintenance background worker"),
+							  errhint("Increasing max_worker_processes might help.")));
+
+			dbData->daemonStarted = false;
+			LWLockRelease(&MaintenanceDaemonControl->lock);
+
+			return;
 		}
 
 		dbData->daemonStarted = true;
+		dbData->userOid = extensionOwner;
 		dbData->workerPid = 0;
 		dbData->triggerMetadataSync = false;
 		LWLockRelease(&MaintenanceDaemonControl->lock);
